@@ -16,7 +16,13 @@ import {
   Logger,
 } from 'src/core/server';
 
-import { JSON_HEADER, READ_ONLY_MODE_HEADER } from '../../common/constants';
+import {
+  ENTERPRISE_SEARCH_SESSION_COOKIE,
+  ENTERPRISE_SEARCH_SESSION_HEADER,
+  JSON_HEADER,
+  READ_ONLY_MODE_HEADER,
+} from '../../common/constants';
+
 import { ConfigType } from '../index';
 
 interface ConstructorDependencies {
@@ -261,13 +267,27 @@ export class EnterpriseSearchRequestHandler {
   /**
    * Set response headers
    *
-   * Currently just forwards the read-only mode header, but we can expand this
-   * in the future to pass more headers from Enterprise Search as we need them
+   * Extracts the encrypted Enterprise Search session cookie from the set-cookie
+   * header and passes it along as an additional header. Also forwards the
+   * read-only mode header.
    */
 
   setResponseHeaders(apiResponse: Response) {
     const readOnlyMode = apiResponse.headers.get(READ_ONLY_MODE_HEADER);
     this.headers[READ_ONLY_MODE_HEADER] = readOnlyMode as 'true' | 'false';
+    this.headers[ENTERPRISE_SEARCH_SESSION_HEADER] = this.extractEnterpriseSearchSessionCookie(apiResponse);
+  }
+
+  extractEnterpriseSearchSessionCookie(apiResponse: Response) {
+    const cookiePayloads = apiResponse.headers.raw()['set-cookie'].map((cookieEntry) => {
+      return cookieEntry.split(';')[0]
+    })
+
+    const entSearchSessionPayload = cookiePayloads.find((cookiePayload) => {
+      return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_SESSION_COOKIE
+    })
+
+    return entSearchSessionPayload.split('=')[1]
   }
 
   /**

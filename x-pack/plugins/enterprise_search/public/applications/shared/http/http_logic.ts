@@ -9,7 +9,11 @@ import { kea, MakeLogicType } from 'kea';
 
 import { HttpSetup, HttpInterceptorResponseError, HttpResponse } from 'src/core/public';
 
-import { READ_ONLY_MODE_HEADER } from '../../../../common/constants';
+import {
+  ENTERPRISE_SEARCH_KIBANA_COOKIE,
+  ENTERPRISE_SEARCH_SESSION_HEADER,
+  READ_ONLY_MODE_HEADER,
+} from '../../../../common/constants';
 
 interface HttpValues {
   http: HttpSetup;
@@ -22,6 +26,7 @@ interface HttpActions {
   setHttpInterceptors(httpInterceptors: Function[]): { httpInterceptors: Function[] };
   setErrorConnecting(errorConnecting: boolean): { errorConnecting: boolean };
   setReadOnlyMode(readOnlyMode: boolean): { readOnlyMode: boolean };
+  setEnterpriseSearchSession(entSearchSession: string): { entSearchSession: string };
 }
 
 export const HttpLogic = kea<MakeLogicType<HttpValues, HttpActions>>({
@@ -31,6 +36,7 @@ export const HttpLogic = kea<MakeLogicType<HttpValues, HttpActions>>({
     setHttpInterceptors: (httpInterceptors) => ({ httpInterceptors }),
     setErrorConnecting: (errorConnecting) => ({ errorConnecting }),
     setReadOnlyMode: (readOnlyMode) => ({ readOnlyMode }),
+    setEnterpriseSearchSession: (entSearchSession: string) => ({ entSearchSession }),
   },
   reducers: ({ props }) => ({
     http: [props.http, {}],
@@ -91,7 +97,24 @@ export const HttpLogic = kea<MakeLogicType<HttpValues, HttpActions>>({
       });
       httpInterceptors.push(readOnlyModeInterceptor);
 
+      const entSearchSessionInterceptor = values.http.intercept({
+        response: async (httpResponse) => {
+          if (isEnterpriseSearchApi(httpResponse)) {
+            const entSearchSession = httpResponse.response!.headers.get(ENTERPRISE_SEARCH_SESSION_HEADER);
+
+            actions.setEnterpriseSearchSession(entSearchSession);
+          }
+
+          return Promise.resolve(httpResponse);
+        },
+      });
+      httpInterceptors.push(entSearchSessionInterceptor);
+
       actions.setHttpInterceptors(httpInterceptors);
+    },
+    setEnterpriseSearchSession: async ({ entSearchSession }) => {
+      const an_hour_from_now = 'Thu, 31 Oct 2021 07:28:00 GMT';
+      document.cookie = `${ENTERPRISE_SEARCH_KIBANA_COOKIE}=${entSearchSession}; Path=/; Expires=${an_hour_from_now};`;
     },
   }),
   events: ({ values, actions }) => ({
