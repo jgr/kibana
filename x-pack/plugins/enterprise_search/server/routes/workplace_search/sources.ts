@@ -196,6 +196,7 @@ export function registerAccountSourceReauthPrepareRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/sources/:id/reauth_prepare',
+      extractSessionCookie: true,
     })
   );
 }
@@ -262,6 +263,7 @@ export function registerAccountPrepareSourcesRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/sources/:serviceType/prepare',
+      extractSessionCookie: true,
     })
   );
 }
@@ -541,6 +543,7 @@ export function registerOrgSourceReauthPrepareRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/org/sources/:id/reauth_prepare',
+      extractSessionCookie: true,
     })
   );
 }
@@ -608,6 +611,7 @@ export function registerOrgPrepareSourcesRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/org/sources/:serviceType/prepare',
+      extractSessionCookie: true,
     })
   );
 }
@@ -864,6 +868,7 @@ export function registerOauthConnectorParamsRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/sources/create',
+      sendSessionCookie: true,
     })
   );
 }

@@ -21,7 +21,14 @@ import { HttpLogic } from '../../../../../shared/http';
 import { KibanaLogic } from '../../../../../shared/kibana';
 import { parseQueryParams } from '../../../../../shared/query_params';
 import { AppLogic } from '../../../../app_logic';
-import { CUSTOM_SERVICE_TYPE, WORKPLACE_SEARCH_URL_PREFIX } from '../../../../constants';
+
+import {
+  ENTERPRISE_SEARCH_KIBANA_COOKIE,
+  ENTERPRISE_SEARCH_SESSION_HEADER,
+  CUSTOM_SERVICE_TYPE,
+  WORKPLACE_SEARCH_URL_PREFIX,
+} from '../../../../constants';
+
 import { SOURCES_PATH, getSourcesPath } from '../../../../routes';
 import { CustomSource } from '../../../../types';
 import { staticSourceData } from '../../source_data';
@@ -446,8 +453,17 @@ export const AddSourceLogic = kea<MakeLogicType<AddSourceValues, AddSourceAction
         consumer_key: sourceConfigData.configuredFields?.consumerKey,
       };
 
+      //const headers: Record<string, string> = {};
+      // TODO jgr should this be in some error handling?
+      // If there is no cookie we should probably error since we need it for checking state
+      //const entSearchSessionCookie = document.cookie.split('; ').find((cookiePayload) => {
+      //  return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_KIBANA_COOKIE
+      //});
+      //headers[ENTERPRISE_SEARCH_SESSION_HEADER] = entSearchSessionCookie.split('=')[1];
+
       try {
         const response = await http(route, {
+          //headers: headers,
           body: JSON.stringify(params),
         });
         if (successCallback) successCallback();

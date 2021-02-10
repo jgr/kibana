@@ -102,7 +102,9 @@ export const HttpLogic = kea<MakeLogicType<HttpValues, HttpActions>>({
           if (isEnterpriseSearchApi(httpResponse)) {
             const entSearchSession = httpResponse.response!.headers.get(ENTERPRISE_SEARCH_SESSION_HEADER);
 
-            actions.setEnterpriseSearchSession(entSearchSession);
+            if (entSearchSession) {
+                actions.setEnterpriseSearchSession(entSearchSession);
+            }
           }
 
           return Promise.resolve(httpResponse);

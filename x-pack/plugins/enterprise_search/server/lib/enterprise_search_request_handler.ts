@@ -18,6 +18,7 @@ import {
 
 import {
   ENTERPRISE_SEARCH_SESSION_COOKIE,
+  ENTERPRISE_SEARCH_KIBANA_COOKIE,
   ENTERPRISE_SEARCH_SESSION_HEADER,
   JSON_HEADER,
   READ_ONLY_MODE_HEADER,
@@ -33,6 +34,8 @@ interface RequestParams {
   path: string;
   params?: object;
   hasValidData?: Function;
+  sendSessionCookie?: boolean;
+  extractSessionCookie?: boolean;
 }
 interface ErrorResponse {
   message: string;
@@ -62,7 +65,7 @@ export class EnterpriseSearchRequestHandler {
     this.enterpriseSearchUrl = config.host as string;
   }
 
-  createRequest({ path, params = {}, hasValidData = () => true }: RequestParams) {
+  createRequest({ path, params = {}, hasValidData = () => true, sendSessionCookie = false, extractSessionCookie = false }: RequestParams) {
     return async (
       _context: RequestHandlerContext,
       request: KibanaRequest<unknown, unknown, unknown>,
@@ -84,11 +87,25 @@ export class EnterpriseSearchRequestHandler {
           ? JSON.stringify(request.body)
           : undefined;
 
+        // Add the session cookie if the session has been passed along
+        // TODO jgr should this be in some error handling?
+        // If there is no cookie we should probably error since we need it for checking state
+        const entSearchSessionCookie = request.headers.cookie.split('; ').find((cookiePayload) => {
+          return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_KIBANA_COOKIE
+        });
+        console.log('the extracted cookie:')
+        console.log(entSearchSessionCookie)
+        if (sendSessionCookie && entSearchSessionCookie) {
+          headers['cookie'] = `${ENTERPRISE_SEARCH_SESSION_COOKIE}=${entSearchSessionCookie.split('=')[1]}`;
+        }
+
+        console.log('headers we sent back')
+        console.log(headers)
         // Call the Enterprise Search API
         const apiResponse = await fetch(url, { method, headers, body });
 
         // Handle response headers
-        this.setResponseHeaders(apiResponse);
+        this.setResponseHeaders(apiResponse, extractSessionCookie);
 
         // Handle unauthenticated users / authentication redirects
         if (
@@ -272,22 +289,31 @@ export class EnterpriseSearchRequestHandler {
    * read-only mode header.
    */
 
-  setResponseHeaders(apiResponse: Response) {
+  setResponseHeaders(apiResponse: Response, extractSessionCookie: boolean) {
     const readOnlyMode = apiResponse.headers.get(READ_ONLY_MODE_HEADER);
     this.headers[READ_ONLY_MODE_HEADER] = readOnlyMode as 'true' | 'false';
-    this.headers[ENTERPRISE_SEARCH_SESSION_HEADER] = this.extractEnterpriseSearchSessionCookie(apiResponse);
+
+    const entSearchSession = this.extractEnterpriseSearchSessionCookie(apiResponse);
+    if (extractSessionCookie && entSearchSession) {
+      this.headers[ENTERPRISE_SEARCH_SESSION_HEADER] = entSearchSession
+    }
   }
 
   extractEnterpriseSearchSessionCookie(apiResponse: Response) {
-    const cookiePayloads = apiResponse.headers.raw()['set-cookie'].map((cookieEntry) => {
-      return cookieEntry.split(';')[0]
-    })
+    const cookieHeaders = apiResponse.headers.raw()['set-cookie']
+    if (cookieHeaders) {
+      const cookiePayloads = cookieHeaders.map((cookieEntry) => {
+        console.log(`The original cookie: ${cookieEntry}`)
+        return cookieEntry.split(';')[0]
+      });
 
-    const entSearchSessionPayload = cookiePayloads.find((cookiePayload) => {
-      return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_SESSION_COOKIE
-    })
-
-    return entSearchSessionPayload.split('=')[1]
+      const entSearchSessionPayload = cookiePayloads.find((cookiePayload) => {
+        return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_SESSION_COOKIE
+      });
+      return entSearchSessionPayload.split('=')[1];
+    } else {
+      return undefined;
+    }
   }
 
   /**
