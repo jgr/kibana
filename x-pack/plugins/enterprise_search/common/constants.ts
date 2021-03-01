@@ -82,8 +82,4 @@ export const JSON_HEADER = {
 
 export const READ_ONLY_MODE_HEADER = 'x-ent-search-read-only-mode';
 
-export const ENTERPRISE_SEARCH_SESSION_COOKIE = '_st_togo_session';
-
-export const ENTERPRISE_SEARCH_SESSION_HEADER = 'x-ent-search-encrypted-session';
-
 export const ENTERPRISE_SEARCH_KIBANA_COOKIE = '_enterprise_search_session';

@@ -9,6 +9,9 @@ import { schema } from '@kbn/config-schema';
 
 import { RouteDependencies } from '../../plugin';
 
+import { ENTERPRISE_SEARCH_KIBANA_COOKIE } from '../../../common/constants';
+import { KibanaRequest } from 'kibana/server';
+
 const schemaValuesSchema = schema.recordOf(
   schema.string(),
   schema.oneOf([
@@ -196,7 +199,6 @@ export function registerAccountSourceReauthPrepareRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/sources/:id/reauth_prepare',
-      extractSessionCookie: true,
     })
   );
 }
@@ -263,7 +265,6 @@ export function registerAccountPrepareSourcesRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/sources/:serviceType/prepare',
-      extractSessionCookie: true,
     })
   );
 }
@@ -543,7 +544,6 @@ export function registerOrgSourceReauthPrepareRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/org/sources/:id/reauth_prepare',
-      extractSessionCookie: true,
     })
   );
 }
@@ -611,7 +611,6 @@ export function registerOrgPrepareSourcesRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/org/sources/:serviceType/prepare',
-      extractSessionCookie: true,
     })
   );
 }
@@ -868,7 +867,30 @@ export function registerOauthConnectorParamsRoute({
     },
     enterpriseSearchRequestHandler.createRequest({
       path: '/ws/sources/create',
-      sendSessionCookie: true,
+      computeExtraParams: (request : KibanaRequest) => {
+        // In the future the token package will be stored in the login session. For now it's in a cookie.
+        const cookieHeader = request.headers.cookie;
+
+        if (!cookieHeader) {
+          return {};
+        }
+
+        // Take any cookie headers and split the individual cookies out, e.g. "_my_cookie=chocolateChip"
+        const cookiePayloads = [cookieHeader].flat().flatMap((rawHeader) => rawHeader.split('; '));
+
+        // Split those raw cookies into [key, value] pairs, e.g. ["_my_cookie", "chocolateChip"]
+        const cookiePairs = cookiePayloads.map((rawCookie) => rawCookie.split('='));
+
+        const tokenPackageCookie = cookiePairs.find( (cookiePair) => {
+          return cookiePair[0] === ENTERPRISE_SEARCH_KIBANA_COOKIE;
+        });
+
+        if (tokenPackageCookie) {
+          return { token_package: tokenPackageCookie[1] };
+        } else {
+          return {};
+        }
+      },
     })
   );
 }

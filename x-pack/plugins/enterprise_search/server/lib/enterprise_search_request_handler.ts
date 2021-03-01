@@ -17,9 +17,7 @@ import {
 } from 'src/core/server';
 
 import {
-  ENTERPRISE_SEARCH_SESSION_COOKIE,
   ENTERPRISE_SEARCH_KIBANA_COOKIE,
-  ENTERPRISE_SEARCH_SESSION_HEADER,
   JSON_HEADER,
   READ_ONLY_MODE_HEADER,
 } from '../../common/constants';
@@ -34,8 +32,7 @@ interface RequestParams {
   path: string;
   params?: object;
   hasValidData?: Function;
-  sendSessionCookie?: boolean;
-  extractSessionCookie?: boolean;
+  computeExtraParams?: Function;
 }
 interface ErrorResponse {
   message: string;
@@ -65,7 +62,7 @@ export class EnterpriseSearchRequestHandler {
     this.enterpriseSearchUrl = config.host as string;
   }
 
-  createRequest({ path, params = {}, hasValidData = () => true, sendSessionCookie = false, extractSessionCookie = false }: RequestParams) {
+  createRequest({ path, params = {}, hasValidData = () => true, computeExtraParams = () => {} }: RequestParams) {
     return async (
       _context: RequestHandlerContext,
       request: KibanaRequest<unknown, unknown, unknown>,
@@ -74,7 +71,7 @@ export class EnterpriseSearchRequestHandler {
       try {
         // Set up API URL
         const encodedPath = this.encodePathParams(path, request.params as Record<string, string>);
-        const queryParams = { ...(request.query as object), ...params };
+        const queryParams = { ...(request.query as object), ...params, ...computeExtraParams(request) };
         const queryString = !this.isEmptyObj(queryParams)
           ? `?${querystring.stringify(queryParams)}`
           : '';
@@ -87,25 +84,11 @@ export class EnterpriseSearchRequestHandler {
           ? JSON.stringify(request.body)
           : undefined;
 
-        // Add the session cookie if the session has been passed along
-        // TODO jgr should this be in some error handling?
-        // If there is no cookie we should probably error since we need it for checking state
-        const entSearchSessionCookie = request.headers.cookie.split('; ').find((cookiePayload) => {
-          return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_KIBANA_COOKIE
-        });
-        console.log('the extracted cookie:')
-        console.log(entSearchSessionCookie)
-        if (sendSessionCookie && entSearchSessionCookie) {
-          headers['cookie'] = `${ENTERPRISE_SEARCH_SESSION_COOKIE}=${entSearchSessionCookie.split('=')[1]}`;
-        }
-
-        console.log('headers we sent back')
-        console.log(headers)
         // Call the Enterprise Search API
         const apiResponse = await fetch(url, { method, headers, body });
 
         // Handle response headers
-        this.setResponseHeaders(apiResponse, extractSessionCookie);
+        this.setResponseHeaders(apiResponse);
 
         // Handle unauthenticated users / authentication redirects
         if (
@@ -136,11 +119,15 @@ export class EnterpriseSearchRequestHandler {
           return this.handleInvalidDataError(response, url, json);
         }
 
+        // Intercept data that is meant for the server side session
+        const { _sessionData, ...responseJson } = json;
+        _sessionData && this.setSessionData(_sessionData);
+
         // Pass successful responses back to the front-end
         return response.custom({
           statusCode: status,
           headers: this.headers,
-          body: json,
+          body: responseJson,
         });
       } catch (e) {
         // Catch connection/auth errors
@@ -284,35 +271,31 @@ export class EnterpriseSearchRequestHandler {
   /**
    * Set response headers
    *
-   * Extracts the encrypted Enterprise Search session cookie from the set-cookie
-   * header and passes it along as an additional header. Also forwards the
-   * read-only mode header.
+   * Currently just forwards the read-only mode header, but we can expand this
+   * in the future to pass more headers from Enterprise Search as we need them
    */
 
-  setResponseHeaders(apiResponse: Response, extractSessionCookie: boolean) {
+  setResponseHeaders(apiResponse: Response) {
     const readOnlyMode = apiResponse.headers.get(READ_ONLY_MODE_HEADER);
     this.headers[READ_ONLY_MODE_HEADER] = readOnlyMode as 'true' | 'false';
-
-    const entSearchSession = this.extractEnterpriseSearchSessionCookie(apiResponse);
-    if (extractSessionCookie && entSearchSession) {
-      this.headers[ENTERPRISE_SEARCH_SESSION_HEADER] = entSearchSession
-    }
   }
 
-  extractEnterpriseSearchSessionCookie(apiResponse: Response) {
-    const cookieHeaders = apiResponse.headers.raw()['set-cookie']
-    if (cookieHeaders) {
-      const cookiePayloads = cookieHeaders.map((cookieEntry) => {
-        console.log(`The original cookie: ${cookieEntry}`)
-        return cookieEntry.split(';')[0]
-      });
+  /**
+   * Extract Session Data
+   *
+   * In the future, this will set the keys passed back from Enterprise Search
+   * into the Kibana login session.
+   * For now we'll explicity look for the Workplace Search OAuth token package
+   * and stuff it into a cookie so it can be picked up later when we proxy the
+   * OAuth callback.
+   */
+  setSessionData(sessionData : { [key: string] : string } ) {
+    if (sessionData['wsOAuthTokenPackage']) {
+      const cookiePayload = `${ENTERPRISE_SEARCH_KIBANA_COOKIE}=${sessionData['wsOAuthTokenPackage']}`;
+      const anHourFromNow = new Date();
+      anHourFromNow.setHours(anHourFromNow.getHours() + 1);
 
-      const entSearchSessionPayload = cookiePayloads.find((cookiePayload) => {
-        return cookiePayload.split('=')[0] === ENTERPRISE_SEARCH_SESSION_COOKIE
-      });
-      return entSearchSessionPayload.split('=')[1];
-    } else {
-      return undefined;
+      this.headers['set-cookie'] = `${cookiePayload}; Path=/; Expires=${anHourFromNow.toUTCString()}; SameSite=Lax; HttpOnly`;
     }
   }
 
