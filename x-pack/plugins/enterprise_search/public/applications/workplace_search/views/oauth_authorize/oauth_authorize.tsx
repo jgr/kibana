@@ -6,12 +6,17 @@
  */
 
 import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
+import { Location } from 'history';
 import { useActions, useValues } from 'kea';
 
 import {
   EuiButton,
   EuiCallOut,
+  EuiHeaderSection,
+  EuiHeaderSectionItem,
+  EuiHeaderLogo,
   EuiPage,
   EuiPageBody,
   EuiPanel,
@@ -22,12 +27,27 @@ import {
   EuiSpacer,
 } from '@elastic/eui';
 
+import { FormattedMessage } from '@kbn/i18n/react';
+
 import { FlashMessages } from '../../../shared/flash_messages';
 import { Loading } from '../../../shared/loading';
+
+import { WORKPLACE_SEARCH_TITLE } from '../../constants';
+
+import {
+  AUTHORIZATION_REQUIRED_TITLE,
+  AUTHORIZE_BUTTON_LABEL,
+  DENY_BUTTON_LABEL,
+  HTTP_REDIRECT_WARNING_MESSAGE,
+  SCOPES_LEAD_IN_MESSAGE,
+  SEARCH_SCOPE_DESCRIPTION,
+  WRITE_SCOPE_DESCRIPTION,
+} from './constants';
 
 import { OAuthAuthorizeLogic } from './oauth_authorize_logic';
 
 export const OAuthAuthorize: React.FC = () => {
+  const { search } = useLocation() as Location;
   const { initializeOAuthPreAuth, allowOAuthAuthorization, denyOAuthAuthorization } = useActions(
     OAuthAuthorizeLogic
   );
@@ -35,23 +55,49 @@ export const OAuthAuthorize: React.FC = () => {
   const { buttonLoading, dataLoading, cachedPreAuth } = useValues(OAuthAuthorizeLogic);
 
   useEffect(() => {
-    initializeOAuthPreAuth();
+    initializeOAuthPreAuth(search);
   }, []);
 
   if (dataLoading) return <Loading />;
 
-  const showHttpRedirectUriWarning = false;
+  const showHttpRedirectUriWarning = cachedPreAuth.redirectUri.startsWith('http:');
 
   const httpRedirectUriWarning = (
     <>
-      <EuiCallOut
-        title="This application is using an insecure redirect URI (http)"
-        color="danger"
-        iconType="cross"
-      />
+      <EuiCallOut title={HTTP_REDIRECT_WARNING_MESSAGE} color="danger" iconType="cross" />
       <EuiSpacer />
     </>
   );
+
+  const scopeDescription = (scopeName: string): string | undefined => {
+    if (scopeName === 'search') {
+      return SEARCH_SCOPE_DESCRIPTION;
+    } else if (scopeName === 'write') {
+      return WRITE_SCOPE_DESCRIPTION;
+    } else {
+      return undefined;
+    }
+  };
+
+  const scopeListItems = cachedPreAuth.scopes.map((scope) => {
+    const scopeDesc = scopeDescription(scope);
+
+    if (scopeDesc) {
+      return <li>{scopeDesc}</li>;
+    } else {
+      return (
+        <li>
+          <FormattedMessage
+            id="xpack.enterpriseSearch.workplaceSearch.oauthAuthorize.UnknownScopeDescription"
+            defaultMessage="{unknownAction} your data"
+            values={{
+              unknownAction: scope,
+            }}
+          />
+        </li>
+      );
+    }
+  });
 
   return (
     <EuiPage restrictWidth>
@@ -59,24 +105,34 @@ export const OAuthAuthorize: React.FC = () => {
         <FlashMessages />
         <EuiSpacer />
         <EuiPanel paddingSize="l" style={{ maxWidth: 500, margin: '40px auto' }}>
+          <EuiHeaderSection>
+            <EuiHeaderSectionItem>
+              <EuiHeaderLogo iconType="logoWorkplaceSearch" />
+              <EuiTitle>
+                <h1>{WORKPLACE_SEARCH_TITLE}</h1>
+              </EuiTitle>
+            </EuiHeaderSectionItem>
+          </EuiHeaderSection>
+          <EuiSpacer />
           <EuiTitle>
-            <h1>Workplace Search</h1>
-          </EuiTitle>
-          <EuiTitle>
-            <h2>Authorization required</h2>
+            <h2>{AUTHORIZATION_REQUIRED_TITLE}</h2>
           </EuiTitle>
           <EuiSpacer />
           <EuiText>
             <p>
-              Authorize <strong>{cachedPreAuth.clientName}</strong> to use your account?
+              <FormattedMessage
+                id="xpack.enterpriseSearch.workplaceSearch.oauthAuthorize.AuthorizationDescription"
+                defaultMessage="Authorize {strongClientName} to use your account?"
+                values={{
+                  strongClientName: <strong>{cachedPreAuth.clientName}</strong>,
+                }}
+              />
             </p>
           </EuiText>
           <EuiSpacer />
-          {httpRedirectUriWarning}
-          <EuiCallOut title="This application will be able to" iconType="iInCircle">
-            <ul>
-              <li>Search your data</li>
-            </ul>
+          {showHttpRedirectUriWarning && httpRedirectUriWarning}
+          <EuiCallOut title={SCOPES_LEAD_IN_MESSAGE} iconType="iInCircle">
+            <ul>{scopeListItems}</ul>
           </EuiCallOut>
 
           <EuiSpacer />
@@ -84,7 +140,7 @@ export const OAuthAuthorize: React.FC = () => {
           <EuiFlexGroup>
             <EuiFlexItem>
               <EuiButton color="danger" onClick={denyOAuthAuthorization} disabled={buttonLoading}>
-                Deny
+                {DENY_BUTTON_LABEL}
               </EuiButton>
             </EuiFlexItem>
             <EuiFlexItem>
@@ -94,7 +150,7 @@ export const OAuthAuthorize: React.FC = () => {
                 onClick={allowOAuthAuthorization}
                 disabled={buttonLoading}
               >
-                Authorize
+                {AUTHORIZE_BUTTON_LABEL}
               </EuiButton>
             </EuiFlexItem>
           </EuiFlexGroup>

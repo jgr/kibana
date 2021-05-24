@@ -7,8 +7,10 @@
 
 import { kea, MakeLogicType } from 'kea';
 
+import { JSON_HEADER as headers } from '../../../../../common/constants';
 import { clearFlashMessages, flashAPIErrors } from '../../../shared/flash_messages';
 import { HttpLogic } from '../../../shared/http';
+import { parseQueryParams } from '../../../shared/query_params';
 
 interface OAuthPreAuthServerProps {
   client_id: string;
@@ -17,6 +19,18 @@ interface OAuthPreAuthServerProps {
   response_type: string;
   scope: string;
   state: string;
+  status: string;
+}
+
+interface OAuthAuthorizeParams {
+  client_id: string;
+  code_challenge?: string;
+  code_challenge_method?: string;
+  response_type: string;
+  response_mode?: string;
+  redirect_uri?: string;
+  scope?: string;
+  state?: string;
 }
 
 interface OAuthPreAuthorization {
@@ -37,7 +51,7 @@ interface OAuthAuthorizeValues {
 
 interface OAuthAuthorizeActions {
   setServerProps(serverProps: OAuthPreAuthServerProps): OAuthPreAuthServerProps;
-  initializeOAuthPreAuth(queryParams: string): void;
+  initializeOAuthPreAuth(queryString: string): string;
   allowOAuthAuthorization(): void;
   denyOAuthAuthorization(): void;
   setButtonNotLoading(): void;
@@ -49,7 +63,7 @@ export const OAuthAuthorizeLogic = kea<MakeLogicType<OAuthAuthorizeValues, OAuth
   path: ['enterprise_search', 'workplace_search', 'oauth_authorize_logic'],
   actions: {
     setServerProps: (serverProps: OAuthPreAuthServerProps) => serverProps,
-    initializeOAuthPreAuth: (queryParams: string) => null,
+    initializeOAuthPreAuth: (queryString: string) => queryString,
     allowOAuthAuthorization: () => null,
     denyOAuthAuthorization: () => null,
     setButtonNotLoading: () => null,
@@ -76,23 +90,40 @@ export const OAuthAuthorizeLogic = kea<MakeLogicType<OAuthAuthorizeValues, OAuth
       },
     ],
   },
-  listeners: ({ actions }) => ({
-    initializeOAuthPreAuth: async (queryParams: string) => {
+  listeners: ({ actions, values }) => ({
+    initializeOAuthPreAuth: async (queryString: string) => {
       clearFlashMessages();
       const { http } = HttpLogic.values;
+      const query = (parseQueryParams(queryString) as unknown) as OAuthAuthorizeParams;
 
       try {
-        const response = await http.get(route, { query: queryParams });
-        actions.setServerProps(response);
+        const response = await http.get(route, { query });
+
+        if (response.status === 'redirect') {
+          window.location.replace(response.redirect_uri);
+        } else {
+          actions.setServerProps(response);
+        }
       } catch (e) {
         flashAPIErrors(e);
       }
     },
     denyOAuthAuthorization: async () => {
       const { http } = HttpLogic.values;
+      const { cachedPreAuth } = values;
 
       try {
-        const response = await http.get(route);
+        const response = await http.delete(route, {
+          body: JSON.stringify({
+            client_id: cachedPreAuth.clientId,
+            response_type: cachedPreAuth.responseType,
+            redirect_uri: cachedPreAuth.redirectUri,
+            scope: cachedPreAuth.rawScopes,
+            state: cachedPreAuth.state,
+          }),
+          headers,
+        });
+
         window.location.replace(response.redirect_uri);
       } catch (e) {
         flashAPIErrors(e);
@@ -101,9 +132,20 @@ export const OAuthAuthorizeLogic = kea<MakeLogicType<OAuthAuthorizeValues, OAuth
     },
     allowOAuthAuthorization: async () => {
       const { http } = HttpLogic.values;
+      const { cachedPreAuth } = values;
 
       try {
-        const response = await http.get(route);
+        const response = await http.post(route, {
+          body: JSON.stringify({
+            client_id: cachedPreAuth.clientId,
+            response_type: cachedPreAuth.responseType,
+            redirect_uri: cachedPreAuth.redirectUri,
+            scope: cachedPreAuth.rawScopes,
+            state: cachedPreAuth.state,
+          }),
+          headers,
+        });
+
         window.location.replace(response.redirect_uri);
       } catch (e) {
         flashAPIErrors(e);

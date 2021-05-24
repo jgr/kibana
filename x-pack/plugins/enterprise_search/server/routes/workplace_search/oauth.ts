@@ -18,6 +18,7 @@ export function registerOAuthAuthorizeRoute({
       path: '/api/workplace_search/oauth/authorize',
       validate: {
         query: schema.object({
+          access_type: schema.maybe(schema.string()),
           client_id: schema.string(),
           code_challenge: schema.maybe(schema.string()),
           code_challenge_method: schema.maybe(schema.string()),
