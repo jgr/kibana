@@ -9,6 +9,7 @@ import {
   Plugin,
   PluginInitializerContext,
   CoreSetup,
+  CoreStart,
   Logger,
   SavedObjectsServiceStart,
   IRouter,
@@ -17,7 +18,7 @@ import {
 } from '../../../../src/core/server';
 import { UsageCollectionSetup } from '../../../../src/plugins/usage_collection/server';
 import { PluginSetupContract as FeaturesPluginSetup } from '../../features/server';
-import { SecurityPluginSetup } from '../../security/server';
+import { SecurityPluginSetup, SecurityPluginStart } from '../../security/server';
 import { SpacesPluginStart } from '../../spaces/server';
 
 import {
@@ -54,6 +55,7 @@ interface PluginsSetup {
 }
 
 interface PluginsStart {
+  security?: SecurityPluginStart;
   spaces?: SpacesPluginStart;
 }
 
@@ -68,6 +70,7 @@ export interface RouteDependencies {
 export class EnterpriseSearchPlugin implements Plugin {
   private readonly config: ConfigType;
   private readonly logger: Logger;
+  private #userDataStorageScope;
 
   constructor(initializerContext: PluginInitializerContext) {
     this.config = initializerContext.config.get<ConfigType>();
@@ -80,6 +83,12 @@ export class EnterpriseSearchPlugin implements Plugin {
   ) {
     const config = this.config;
     const log = this.logger;
+
+    /**
+     * Initialize UserDataStorage access
+     */
+
+    this.#userDataStorageScope = security?.session.userData.registerScope('xpack.myPlugin');
 
     /**
      * Register space/feature control
@@ -155,7 +164,9 @@ export class EnterpriseSearchPlugin implements Plugin {
     registerTelemetryRoute({ ...dependencies, getSavedObjectsService: () => savedObjectsStarted });
   }
 
-  public start() {}
+  public start(_core: CoreStart, { security }: PluginsStart) {
+    const userDataStorage = security?.session.userData.getStorage(this.#userDataStorageScope);
+  }
 
   public stop() {}
 }
