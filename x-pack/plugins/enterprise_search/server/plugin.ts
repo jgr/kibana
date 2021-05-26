@@ -37,6 +37,8 @@ import {
   IEnterpriseSearchRequestHandler,
 } from './lib/enterprise_search_request_handler';
 
+import { userDataStorage } from './lib/user_data_storage';
+
 import { registerAppSearchRoutes } from './routes/app_search';
 import { registerConfigDataRoute } from './routes/enterprise_search/config_data';
 import { registerTelemetryRoute } from './routes/enterprise_search/telemetry';
@@ -70,7 +72,7 @@ export interface RouteDependencies {
 export class EnterpriseSearchPlugin implements Plugin {
   private readonly config: ConfigType;
   private readonly logger: Logger;
-  private #userDataStorageScope;
+  private userDataStorageScope;
 
   constructor(initializerContext: PluginInitializerContext) {
     this.config = initializerContext.config.get<ConfigType>();
@@ -85,10 +87,10 @@ export class EnterpriseSearchPlugin implements Plugin {
     const log = this.logger;
 
     /**
-     * Initialize UserDataStorage access
+     * Initialize UserDataStorage scope
      */
 
-    this.#userDataStorageScope = security?.session.userData.registerScope('xpack.myPlugin');
+    this.userDataStorageScope = security?.session.userData.registerScope('xpack.enterpriseSearch');
 
     /**
      * Register space/feature control
@@ -165,7 +167,12 @@ export class EnterpriseSearchPlugin implements Plugin {
   }
 
   public start(_core: CoreStart, { security }: PluginsStart) {
-    const userDataStorage = security?.session.userData.getStorage(this.#userDataStorageScope);
+    if (security) {
+      userDataStorage.setUserDataStorage(
+        security.session.userData.getStorage(this.userDataStorageScope),
+        security
+      );
+    }
   }
 
   public stop() {}

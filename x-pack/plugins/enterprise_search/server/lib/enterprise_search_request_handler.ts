@@ -16,13 +16,11 @@ import {
   Logger,
 } from 'src/core/server';
 
-import {
-  ENTERPRISE_SEARCH_KIBANA_COOKIE,
-  JSON_HEADER,
-  READ_ONLY_MODE_HEADER,
-} from '../../common/constants';
+import { JSON_HEADER, READ_ONLY_MODE_HEADER } from '../../common/constants';
 
 import { ConfigType } from '../index';
+
+import { userDataStorage } from './user_data_storage';
 
 interface ConstructorDependencies {
   config: ConfigType;
@@ -123,7 +121,7 @@ export class EnterpriseSearchRequestHandler {
           // Intercept data that is meant for the server side session
           const { _sessionData, ...responseJson } = json;
           if (_sessionData) {
-            this.setSessionData(_sessionData);
+            this.setSessionData(request, _sessionData);
             responseBody = responseJson;
           } else {
             responseBody = json;
@@ -310,16 +308,10 @@ export class EnterpriseSearchRequestHandler {
    * and stuff it into a cookie so it can be picked up later when we proxy the
    * OAuth callback.
    */
-  setSessionData(sessionData: { [key: string]: string }) {
-    if (sessionData.wsOAuthTokenPackage) {
-      const anHourFromNow = new Date(Date.now());
-      anHourFromNow.setHours(anHourFromNow.getHours() + 1);
-
-      const cookiePayload = `${ENTERPRISE_SEARCH_KIBANA_COOKIE}=${sessionData.wsOAuthTokenPackage};`;
-      const cookieRestrictions = `Path=/; Expires=${anHourFromNow.toUTCString()}; SameSite=Lax; HttpOnly`;
-
-      this.headers['set-cookie'] = `${cookiePayload} ${cookieRestrictions}`;
-    }
+  setSessionData(request: KibanaRequest, sessionData: { [key: string]: string }) {
+    Object.keys(sessionData).forEach((key: string) => {
+      userDataStorage.set(request, key, sessionData[key]);
+    });
   }
 
   /**

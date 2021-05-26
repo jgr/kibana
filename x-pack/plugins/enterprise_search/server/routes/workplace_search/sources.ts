@@ -7,9 +7,11 @@
 
 import { schema } from '@kbn/config-schema';
 
-import { getOAuthTokenPackageParams } from '../../lib/get_oauth_token_package_params';
+import { userDataStorage } from '../../lib/user_data_storage';
 
 import { RouteDependencies } from '../../plugin';
+
+const TOKEN_PACKAGE_KEY = 'wsOAuthTokenPackage';
 
 const schemaValuesSchema = schema.recordOf(
   schema.string(),
@@ -914,9 +916,11 @@ export function registerOauthConnectorParamsRoute({
       },
     },
     async (context, request, response) => {
+      const tokenPackage = userDataStorage.get(request, TOKEN_PACKAGE_KEY);
+      const extraParams = tokenPackage ? { token_package: tokenPackage } : {};
       return enterpriseSearchRequestHandler.createRequest({
         path: '/ws/sources/create',
-        params: getOAuthTokenPackageParams(request.headers.cookie),
+        params: extraParams,
       })(context, request, response);
     }
   );
