@@ -22,6 +22,7 @@ import { WorkplaceSearchNav, WorkplaceSearchHeaderActions } from './components/l
 import {
   GROUPS_PATH,
   SETUP_GUIDE_PATH,
+  SEARCH_AUTHORIZE_PATH,
   SOURCES_PATH,
   SOURCE_ADDED_PATH,
   PERSONAL_SOURCES_PATH,
@@ -38,6 +39,7 @@ import { GroupsRouter } from './views/groups';
 import { GroupSubNav } from './views/groups/components/group_sub_nav';
 import { Overview } from './views/overview';
 import { RoleMappingsRouter } from './views/role_mappings';
+import { SearchAuthorize } from './views/search_authorize';
 import { Security } from './views/security';
 import { SettingsRouter } from './views/settings';
 import { SettingsSubNav } from './views/settings/components/settings_sub_nav';
@@ -97,6 +99,9 @@ export const WorkplaceSearchConfigured: React.FC<InitialAppData> = (props) => {
             <Overview />
           </Layout>
         )}
+      </Route>
+      <Route path={SEARCH_AUTHORIZE_PATH}>
+        <SearchAuthorize />
       </Route>
       <Route path={PERSONAL_SOURCES_PATH}>
         <PrivateSourcesLayout restrictWidth readOnlyMode={readOnlyMode}>
