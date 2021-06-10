@@ -95,6 +95,9 @@ export const SearchAuthorizeLogic = kea<
         actions.setRedirectNotPending();
       }
     },
+    setServerProps: () => {
+      actions.authorizeSearch();
+    },
     authorizeSearch: async () => {
       const { http } = HttpLogic.values;
       const { cachedPreAuth } = values;
