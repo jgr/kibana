@@ -25,8 +25,10 @@ export const SearchAuthorize: React.FC = () => {
   const { redirectPending } = useValues(SearchAuthorizeLogic);
 
   useEffect(() => {
-    initializeSearchAuth(searchOAuth);
-  }, []);
+    if (searchOAuth.clientId) {
+      initializeSearchAuth(searchOAuth);
+    }
+  }, [searchOAuth]);
 
   if (redirectPending) return <Loading />;
 

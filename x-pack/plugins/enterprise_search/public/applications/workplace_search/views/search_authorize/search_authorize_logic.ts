@@ -12,6 +12,17 @@ import { SearchOAuth } from '../../../../../common/types';
 import { clearFlashMessages, flashAPIErrors } from '../../../shared/flash_messages';
 import { HttpLogic } from '../../../shared/http';
 
+interface OAuthAuthorizeParams {
+  client_id: string;
+  code_challenge?: string;
+  code_challenge_method?: string;
+  response_type: string;
+  response_mode?: string;
+  redirect_uri?: string;
+  scope?: string;
+  state?: string;
+}
+
 interface OAuthPreAuthServerProps {
   client_id: string;
   client_name: string;
@@ -75,15 +86,15 @@ export const SearchAuthorizeLogic = kea<
       clearFlashMessages();
       const { http } = HttpLogic.values;
 
-      const queryParams = {
+      const query = {
         client_id: searchOAuth.clientId,
         response_type: 'code',
         redirect_uri: searchOAuth.redirectUrl,
         scope: 'search',
-      };
+      } as OAuthAuthorizeParams;
 
       try {
-        const response = await http.get(route, { queryParams });
+        const response = await http.get(route, { query });
 
         if (response.status === 'redirect') {
           window.location.replace(response.redirect_uri);
@@ -109,7 +120,6 @@ export const SearchAuthorizeLogic = kea<
             response_type: cachedPreAuth.responseType,
             redirect_uri: cachedPreAuth.redirectUri,
             scope: cachedPreAuth.rawScopes,
-            state: cachedPreAuth.state,
           }),
           headers,
         });
